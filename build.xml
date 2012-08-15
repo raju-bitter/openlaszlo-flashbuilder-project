@@ -1,4 +1,4 @@
-<project name="OLFashBuilder" default="update-project" basedir=".">
+<project name="OLFlashBuilder" default="update-project" basedir=".">
 <!-- Copyright (c) 2012 Raju Bitter rajubitter@gmail.com
      http://github.com/raju-bitter/openlaszlo-flashbuilder-project
      MIT license http://www.opensource.org/licenses/mit-license.php
@@ -47,7 +47,7 @@
   <taskdef name="xmltask" classname="com.oopsconsultancy.xmltask.ant.XmlTask" classpath="jars/xmltask.jar"/>
 
   <!-- Ant contrib taskdef (used for if-else) -->
-  <taskdef resource="net/sf/antcontrib/antcontrib.properties" classpath="jars/ant-contrib.jar" />
+  <taskdef resource="net/sf/antcontrib/antcontrib.properties" classpath="jars/ant-contrib.jar "/>
 
   <!-- CLASSPATH for Laszlo compiler lzc -->
   <path id="laszlo.compiler.classpath">
@@ -56,7 +56,7 @@
 
 
   <!--================  Target [init] ==============-->
-  <target name="init" depends="checkForLZXFile">
+  <target name="init" depends="checkForLPSHome,checkForLZXFile">
     <fail message="LPS_HOME not set" unless="env.LPS_HOME"/>
     <fail message="Target LZX file for compilation not set in build.properties" unless="APP_FILE"/>
     <!-- Create temp folder -->
@@ -68,6 +68,10 @@
     <mkdir dir="${LIBRARY_DIR}" />
     <fail message="Target folder for generated ActionScript 3 source code not set in build.properties" unless="AS3_SOURCE_DIR"/>
     <antcall target="checkForTargetFolder" />
+  </target>
+
+  <target name="checkForLPSHome" depends="lps.home.check" if="lps.home.missing">
+    <fail message="LPS_HOME could not be found!" />
   </target>
 
   <target name="checkForLZXFile" depends="lzx.file.check" if="lzx.file.missing">
@@ -146,17 +150,34 @@
 
 
   <target name="copy-to-src-folder">
+    <!-- Delete any LFC SWC file in SWC library folder -->
+  	<delete file="${SWC_DIR}/LFC${SWF_RUNTIME}.swc" failonerror="false" />
+  	<delete file="${SWC_DIR}/LFC${SWF_RUNTIME}-debug.swc" failonerror="false" />
     <!-- The folder for the generated source files is
          ${basedir}/${tempPathToAS3Files}/APP_FILE_NAME_WITHOUT_LZX_ENDING/
     -->
     <script language="javascript">
-      var targetFile = OLFashBuilder.getProperty("APP_FILE"),
-          tempPath = OLFashBuilder.getProperty("tempPathToAS3Files"),
-    	  fullPath = OLFashBuilder.getProperty("basedir") + "/" + tempPath + "/"
+      var targetFile = OLFlashBuilder.getProperty("APP_FILE"),
+          tempPath = OLFlashBuilder.getProperty("tempPathToAS3Files"),
+    	  runtime = OLFlashBuilder.getProperty("SWF_RUNTIME");
+    	  fullPath = OLFlashBuilder.getProperty("basedir") + "/" + tempPath + "/"
     	             + targetFile.substring(0, targetFile.length()-4);
-      OLFashBuilder.setProperty("tempPathToAS3Files", fullPath);
+      OLFlashBuilder.setProperty("tempPathToAS3Files", fullPath);
+      var lfcFile = "LFC" + runtime + ".swc";
+      if (OLFlashBuilder.getProperty("LZX_DEBUG_FLAG") == "true") {
+        lfcFile = "LFC" + runtime + "-debug.swc";
+      }
+    	OLFlashBuilder.setProperty("LFC_FILE", lfcFile);
     </script>
-    <!-- Copy generated AS3 code to AS3 source folder-->
+
+  	<echo message="Copying ${LFC_FILE} and external SWC files to libs folder" />
+    <copy todir="${SWC_DIR}" overwrite="true">
+      <fileset dir="${LPS_HOME}/lps/includes/lfc/" casesensitive="true">
+        <include name="${LFC_FILE}" />
+      </fileset>
+    </copy>
+
+  	<!-- Copy generated AS3 code to AS3 source folder-->
     <echo message="tempPathToAS3Files: ${tempPathToAS3Files}" />
     <echo message="Copying files from ${tempPathToAS3Files} to ${FB_PROJECT_SRC}" />
     <copy todir="${FB_PROJECT_SRC}"
@@ -201,6 +222,13 @@
   </target>
 
   <!--================  Helper targets  =================-->
+  <target name="lps.home.check">
+    <condition property="lps.home.missing">
+      <not>
+        <available file="${LPS_HOME}" type="dir"/>
+      </not>
+    </condition>
+  </target>
   <!-- Check if the LZX file in ${APP_FILE} exists -->
   <target name="lzx.file.check">
     <condition property="lzx.file.missing">
