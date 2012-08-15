@@ -1,0 +1,246 @@
+<project name="OLFashBuilder" default="update-project" basedir=".">
+<!-- Copyright (c) 2012 Raju Bitter rajubitter@gmail.com
+     http://github.com/raju-bitter/openlaszlo-flashbuilder-project
+     MIT license http://www.opensource.org/licenses/mit-license.php
+     Use is subject to license terms.
+
+     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+     IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+     FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+     AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+     LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+     THE SOFTWARE.
+
+   IMPORTANT:
+   Please set the following vars in your custom build.properties file.
+
+       APP_FILE=your_file_name_without_path.lzx
+
+       FLEX_HOME=/path/to/your/adobe/flex/sdk/
+
+  The environment variable $LPS_HOME must point to a folder containing an
+  installation of OpenLaszlo 5.0+ (or OpenLaszlo TRUNK).
+
+-->
+
+  <description>
+  Ant build file to profile and debug OpenLaszlo applications using Adobe Flash Builder 4.6
+  </description>
+
+  <!-- Ignore the system classpath -->
+  <property name="build.sysclasspath" value="ignore" />
+
+  <property environment="env"/>
+
+  <!-- OpenLaszlo properties, LPS_HOME needs to be set in uild.properties file -->
+  <property file="${LPS_HOME}/build.properties"/>
+  <property file="${basedir}/build.properties"/>
+
+  <!-- Temp folder where the "lzxonly" compile step writes the
+      generate AS3 classes to. If the target LZX file is in a
+      subfolder relative to $LPS_HOME, the folder path is added
+      to the temp build path -->
+  <property name="tempPathToAS3Files" value="${TEMP_DIR}/lzswf9/${TEMP_LZX_DIR}/build/"/>
+
+  <!-- XMLTask (lib for modifying XML files out of Ant) -->
+  <taskdef name="xmltask" classname="com.oopsconsultancy.xmltask.ant.XmlTask" classpath="jars/xmltask.jar"/>
+
+  <!-- Ant contrib taskdef (used for if-else) -->
+  <taskdef resource="net/sf/antcontrib/antcontrib.properties"/>
+
+  <!-- CLASSPATH for Laszlo compiler lzc -->
+  <path id="laszlo.compiler.classpath">
+    <fileset dir="${LPS_HOME}/WEB-INF/lib" includes="**/*.jar"/>
+  </path>
+
+
+  <!--================  Target [init] ==============-->
+  <target name="init" depends="checkForLZXFile">
+    <fail message="LPS_HOME not set" unless="env.LPS_HOME"/>
+    <fail message="Target LZX file for compilation not set in build.properties" unless="APP_FILE"/>
+    <!-- Create temp folder -->
+    <mkdir dir="${TEMP_DIR}" />
+    <mkdir dir="${AS3_SOURCE_DIR}" />
+ 	<mkdir dir="${TEMP_LZX_DIR}" />
+  	<mkdir dir="${TEMP_LZX_DIR}/${APP_RES_FOLDER}" />
+    <mkdir dir="${BUILD_DIR}" />
+    <mkdir dir="${LIBRARY_DIR}" />
+    <fail message="Target folder for generated ActionScript 3 source code not set in build.properties" unless="AS3_SOURCE_DIR"/>
+    <antcall target="checkForTargetFolder" />
+  </target>
+
+  <target name="checkForLZXFile" depends="lzx.file.check" if="lzx.file.missing">
+    <fail message="The LZX file ${APP_FILE} could not be found!" />
+  </target>
+
+  <target name="checkForTargetFolder" depends="target.folder.check" if="target.folder.missing">
+    <fail message="Folder ${AS3_SOURCE_DIR} doesn't exist, please create first!" />
+  </target>
+
+
+  <!--================  Target [set-canvas-debug-attr] ============== -->
+  <!-- Set <canvas> @debug attribute dynamically
+       Requires XMLTask JAR in Ant classpath: <
+  -->
+  <target name="set-canvas-debug-attr">
+    <echo message="Set canvas debug attribute to ${debug}" />
+    <xmltask source="${LZX_DIR}/${APP_FILE}" todir="${TEMP_DIR}">
+       <attr path="canvas" attr="debug" value="${debug}" />
+    </xmltask>
+  </target>
+
+  <!--================  Target [generate-as3] ==============-->
+  <target name="generate-as3"
+      description="Generate AS3 code for Adobe AIR app"
+      depends="init" >
+
+    <echo message="Setting canvas @debug=${debug}" />
+    <antcall target="set-canvas-debug-attr">
+      <param name="debug" value="${debug}" />
+    </antcall>
+
+    <echo message="Generating AS3 source code" />
+    <antcall target="compile-lzx-file">
+      <param name="file" value="${APP_FILE}" />
+      <param name="args" value="--runtime=swf11" />
+    </antcall>
+  </target>
+
+  <!-- Generate AS3 code out of LZX file: compiles ${file}, using options ${args} -->
+  <target name="compile-lzx-file" description="Compiling LZX to ActionScript 3 source code">
+  	<echo message="Hier: ${TEMP_LZX_DIR}" />
+    <copy todir="${TEMP_LZX_DIR}/${APP_RES_FOLDER}">
+      <fileset dir="${LZX_DIR}/${APP_RES_FOLDER}/" casesensitive="true">
+        <include name="**/*.jpg" />
+        <include name="**/*.png" />
+        <include name="**/*.xml" />
+        <include name="**/*.flv" />
+      </fileset>
+    </copy>
+    <copy todir="${TEMP_LZX_DIR}/${APP_LIB_FOLDER}">
+      <fileset dir="${LZX_DIR}/${APP_LIB_FOLDER}" casesensitive="true">
+        <include name="**/*.lzx" />
+      </fileset>
+    </copy>
+    <echo message="Compiling ${TEMP_LZX_DIR}/${file}"/>
+    <echo message="arg: ${args} ${TEMP_LZX_DIR}/${file}"/>
+    <echo message="Using LPS_HOME: ${LPS_HOME}"/>
+    <java classpathref="laszlo.compiler.classpath" classname="org.openlaszlo.compiler.Main" fork="yes"
+        failonerror="true">
+      <!-- Don't use the default Java temp dir. The generated ActionScript3 files
+           will be located in the Java temp folder -->
+      <sysproperty key="java.io.tmpdir" value="./temp" />
+      <jvmarg value="-Xmx1024M"/>
+      <jvmarg value="-DLPS_HOME=${LPS_HOME}"/>
+      <arg line="${args} ${TEMP_LZX_DIR}/${file}"/>
+    </java>
+    <!-- Remove generated SWF file -->
+    <delete>
+      <fileset dir="${basedir}" casesensitive="no">
+        <include name="*.swf" />
+      </fileset>
+    </delete>
+    <delete dir="${TEMP_DIR}/lzccache" failOnError="true" includeEmptyDirs="true" />
+  </target>
+
+
+  <target name="copy-to-src-folder">
+    <!-- The folder for the generated source files is
+         ${basedir}/${tempPathToAS3Files}/APP_FILE_NAME_WITHOUT_LZX_ENDING/
+    -->
+    <script language="javascript">
+      var targetFile = OLFashBuilder.getProperty("APP_FILE"),
+          tempPath = OLFashBuilder.getProperty("tempPathToAS3Files"),
+    	  fullPath = OLFashBuilder.getProperty("basedir") + "/" + tempPath + "/"
+    	             + targetFile.substring(0, targetFile.length()-4);
+      OLFashBuilder.setProperty("tempPathToAS3Files", fullPath);
+    </script>
+    <!-- Copy generated AS3 code to AS3 source folder-->
+    <echo message="tempPathToAS3Files: ${tempPathToAS3Files}" />
+    <echo message="Copying files from ${tempPathToAS3Files} to ${FB_PROJECT_SRC}" />
+    <copy todir="${FB_PROJECT_SRC}"
+      overwrite="true">
+      <fileset dir="${tempPathToAS3Files}" casesensitive="no">
+      	<exclude name="LzSpriteApplication.as" />
+        <include name="**/*.as" />
+        <!-- Include image, video, XML dataset and other resource files.
+             Add other file extensions here for your own project -->
+        <include name="**/*.jpg" />
+        <include name="**/*.png" />
+        <include name="**/*.xml" />
+        <include name="**/*.flv" />
+      </fileset>
+    </copy>
+
+    <!-- Delete directories generated by LZX->AS3 compiler -->
+    <delete dir="${TEMP_DIR}/lzswf9" failOnError="true" includeEmptyDirs="true" />
+  </target>
+
+  <!--================  Target [clean] ==============-->
+  <target name="clean"  >
+    <delete dir="${TEMP_DIR}" />
+  	<delete>
+  		<!-- Delete all generated ActionScript files besides the main application file -->
+  		<fileset dir="${FB_PROJECT_SRC}">
+  			<exclude name="LzSpriteApplication.as" />
+  			<include name="*.as" />
+  		</fileset>
+  	</delete>
+  </target>
+
+  <!--================  Target [all]  ===================-->
+  <target name="update-project"
+      description="Compile the LZX files and update the Flash Builder project ActionScript 3 source"
+      depends="clean">
+    <echo message="DEBUG_FLAG=${LZX_DEBUG_FLAG}" />
+    <antcall target="generate-as3">
+      <param name="debug" value="${LZX_DEBUG_FLAG}" />
+    </antcall>
+    <antcall target="copy-to-src-folder" />
+  </target>
+
+  <!--================  Helper targets  =================-->
+  <!-- Check if the LZX file in ${APP_FILE} exists -->
+  <target name="lzx.file.check">
+    <condition property="lzx.file.missing">
+      <not>
+        <available file="${LZX_DIR}/${APP_FILE}" type="file"/>
+      </not>
+    </condition>
+  </target>
+  <!-- Check if target folder for the generated source code exist. -->
+  <target name="target.folder.check">
+    <condition property="target.folder.missing">
+      <not>
+        <available file="${AS3_SOURCE_DIR}" type="dir"/>
+      </not>
+    </condition>
+  </target>
+
+  <!-- ============================== Flash Builder ============================== -->
+  <target name="flashbuilder-project-update" depends="clean">
+    <antcall target="generate-as3">
+      <param name="debug" value="${LZX_DEBUG_FLAG}" />
+    </antcall>
+    <antcall target="copy-to-src-folder" />
+    <antcall target="copy-to-fb-project" />
+  </target>
+
+  <target name="copy-to-fb-project">
+    <echo message="Copying ActionScript3 code and resources to ${FB_PROJECT_SRC}" />
+    <copy todir="${FB_PROJECT_SRC}"
+      overwrite="true">
+      <fileset dir="${AS3_SOURCE_DIR}" casesensitive="no">
+        <include name="**/*.as" />
+        <!-- Include image, video, XML dataset and other resource files.
+             Add other file extensions here for your own project -->
+        <include name="**/*.jpg" />
+        <include name="**/*.png" />
+        <include name="**/*.xml" />
+        <include name="**/*.flv" />
+      </fileset>
+    </copy>
+  </target>
+
+</project>

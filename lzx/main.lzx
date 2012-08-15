@@ -1,0 +1,11 @@
+<canvas debug="true">
+
+  <resource name="freeImg" src="resources/img/free.jpg" />
+
+  <include href="classes/simplebox.lzx" />
+
+  <view resource="freeImg" width="150" height="150" />
+
+  <simplebox x="100" y="100" bgcolor="blue" opacity="0.8" />
+
+</canvas>
