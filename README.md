@@ -14,15 +14,13 @@
    THE SOFTWARE.
 
 
-Profiling OpenLaszlo Applications with Flash Builder 4.6
---------------------------------------------------------
+# Profiling OpenLaszlo Applications with Flash Builder 4.6
 
 This project is a template for an OpenLaszlo application to be used when debugging
 or profiling OpenLaszlo SWF10 or SWF11 applications using Adobe Flash Builder 4.6.
 
 
-Requirements
-------------
+## Requirements
 
 Since the SWF11 runtime support has not been added to OpenLaszlo 5.0 (trunk), a nightly
 build of the OpenLaszlo flex4.6 branch has to be used when compiling the LZX code.
@@ -30,12 +28,13 @@ build of the OpenLaszlo flex4.6 branch has to be used when compiling the LZX cod
 The WAR files can be downloaded here:
 http://download.openlaszlo.org/nightly/flex4.6/
 
-After downloading the WAR, unzip it into any folder and set the LPS_HOME property in
-build.properties to that folder.
+After downloading the WAR, unzip it into any folder on your machine, and set the LPS_HOME 
+property in the build.properties file to point to that folder, e.g.
+
+    LPS_HOME=C:/development/flex4.6
 
 
-The Project Folder Structure
-----------------------------
+## The Project Folder Structure
 
 The whole process of compiling LZX into ActionScript3 code is done using an Ant
 build script. There are two files for the build process, the main build.xml and a
@@ -68,3 +67,4 @@ has to be the main application file.
     ├── src
     │   └── LzSpriteApplication.as
     └── swc
+
