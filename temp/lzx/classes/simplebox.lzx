@@ -1,8 +1,0 @@
-<library>
-
-	<class name="simplebox" extends="view">
-		<attribute name="width" value="250" />
-		<attribute name="height" value="250" />
-	</class>
-
-</library>
